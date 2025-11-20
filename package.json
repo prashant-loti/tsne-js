@@ -4,8 +4,9 @@
   "description": "t-SNE implementation in JavaScript",
   "main": "dist/index.js",
   "scripts": {
-    "build-browser": "rm -rf build && mkdir build && browserify src/index.js -t [ babelify --presets [ es2015 ] --plugins [ add-module-exports ] ] -p [minifyify --no-map] --standalone TSNE -o build/tsne.min.js",
-    "build-node": "rm -rf dist && node_modules/.bin/babel src --out-dir dist",
+    "serve": "node server.js",
+    "build-browser": "rimraf build && mkdirp build && browserify src/index.js -t [ babelify --presets [ es2015 ] --plugins [ add-module-exports ] ] -p [minifyify --no-map] --standalone TSNE -o build/tsne.min.js",
+    "build-node": "rimraf dist && babel src --out-dir dist",
     "build": "npm run build-node && npm run build-browser",
     "prepublish": "npm run build",
     "test": "mocha --reporter spec --compilers js:babel-core/register"
@@ -40,7 +41,9 @@
     "browserify": "^13.0.0",
     "eslint": "^2.2.0",
     "minifyify": "^7.3.1",
-    "mocha": "^2.4.5"
+    "mkdirp": "^1.0.4",
+    "mocha": "^2.4.5",
+    "rimraf": "^3.0.2"
   },
   "dependencies": {
     "cwise": "^1.0.9",

@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Face Embeddings Visualizer - t-SNE.js</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1d25;
+      color: #e0e0e0;
+      margin: 0;
+      padding: 0;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    .header h1 {
+      margin: 0;
+      color: white;
+      font-size: 32px;
+    }
+    .header p {
+      margin: 5px 0 0 0;
+      color: rgba(255,255,255,0.9);
+      font-size: 14px;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      gap: 15px;
+      padding: 15px;
+      margin: 0 auto;
+      height: calc(100vh - 100px);
+      max-height: calc(100vh - 100px);
+    }
+    .panel {
+      background: #242830;
+      border-radius: 6px;
+      padding: 15px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .panel h3 {
+      margin: 0 0 12px 0;
+      color: #81cfe0;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 8px;
+      font-size: 16px;
+      position: sticky;
+      top: 0;
+      background: #242830;
+      z-index: 1;
+    }
+    .control-group {
+      margin-bottom: 15px;
+    }
+    .control-group label {
+      display: block;
+      color: #81cfe0;
+      margin-bottom: 5px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    input[type="range"] {
+      width: 100%;
+      margin: 2px 0;
+      height: 4px;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: 4px;
+      width: 100%;
+      margin-bottom: 8px;
+      transition: transform 0.1s, box-shadow 0.1s;
+      font-weight: 600;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .btn:disabled {
+      background: #555;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-secondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .btn-success {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    .upload-area {
+      border: 2px dashed #667eea;
+      border-radius: 6px;
+      padding: 20px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-bottom: 12px;
+      font-size: 13px;
+      position: relative;
+      overflow: hidden;
+    }
+    .upload-area:hover {
+      border-color: #81cfe0;
+      background: rgba(102, 126, 234, 0.1);
+    }
+    .upload-area.drag-over {
+      border-color: #4facfe;
+      background: rgba(79, 172, 254, 0.2);
+      animation: pulse 1s infinite;
+    }
+    .upload-area.uploading {
+      border-color: #4ade80;
+      background: rgba(74, 222, 128, 0.1);
+    }
+    .upload-area.success {
+      border-color: #4ade80;
+      background: rgba(74, 222, 128, 0.2);
+      animation: successPulse 0.5s;
+    }
+    .upload-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #667eea, #4facfe);
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .upload-status {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #4ade80;
+      font-weight: 600;
+      min-height: 16px;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    @keyframes successPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes shimmer {
+      0% { background-position: -1000px 0; }
+      100% { background-position: 1000px 0; }
+    }
+    .shimmer {
+      background: linear-gradient(90deg, transparent, rgba(129, 207, 224, 0.3), transparent);
+      background-size: 1000px 100%;
+      animation: shimmer 2s infinite;
+    }
+    #canvas-container {
+      background: #242830;
+      border-radius: 6px;
+      padding: 5px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      height: 100%;
+    }
+    #canvas {
+      border: 1px solid #333;
+      cursor: grab;
+      background: #1a1d25;
+      transition: transform 0.2s ease-out;
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+    }
+    #canvas:active {
+      cursor: grabbing;
+    }
+    .zoom-controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      z-index: 10;
+    }
+    .zoom-btn {
+      width: 40px;
+      height: 40px;
+      background: rgba(36, 40, 48, 0.95);
+      border: 1px solid #667eea;
+      color: #81cfe0;
+      font-size: 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .zoom-btn:hover {
+      background: #667eea;
+      color: white;
+      transform: scale(1.1);
+    }
+    .view-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+    .pan-hint {
+      position: absolute;
+      bottom: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(36, 40, 48, 0.95);
+      border: 1px solid #667eea;
+      color: #81cfe0;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 11px;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .pan-hint.show {
+      opacity: 1;
+    }
+    .view-btn {
+      padding: 8px 16px;
+      background: rgba(36, 40, 48, 0.95);
+      border: 1px solid #667eea;
+      color: #81cfe0;
+      font-size: 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+    }
+    .view-btn:hover {
+      background: #667eea;
+      color: white;
+      transform: translateY(-2px);
+    }
+    .zoom-level {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(36, 40, 48, 0.95);
+      border: 1px solid #667eea;
+      color: #81cfe0;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 10;
+    }
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+    .face-point {
+      animation: fadeIn 0.3s ease-out;
+    }
+    .status {
+      background: #2a2d35;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .status-label {
+      color: #81cfe0;
+      font-weight: 600;
+    }
+    .tooltip {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.95);
+      border: 2px solid #81cfe0;
+      border-radius: 8px;
+      padding: 10px;
+      pointer-events: none;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .tooltip img {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 4px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .tooltip-info {
+      color: white;
+      font-size: 12px;
+    }
+    .detail-panel {
+      background: #2a2d35;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      display: none;
+    }
+    .detail-panel.active {
+      display: block;
+    }
+    .detail-panel img {
+      width: 100%;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .detail-info {
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .group-item {
+      background: #2a2d35;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .group-item:hover {
+      background: #343740;
+    }
+    .group-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .group-info {
+      flex: 1;
+      font-size: 11px;
+    }
+    .similar-faces {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .similar-face {
+      cursor: pointer;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .similar-face:hover {
+      border-color: #81cfe0;
+    }
+    .similar-face img {
+      width: 100%;
+      height: 60px;
+      object-fit: cover;
+      display: block;
+    }
+    .slider-value {
+      color: #fff;
+      font-weight: bold;
+      float: right;
+    }
+    .info-box {
+      background: rgba(102, 126, 234, 0.1);
+      border-left: 3px solid #667eea;
+      padding: 8px;
+      margin: 8px 0;
+      font-size: 11px;
+      border-radius: 4px;
+      line-height: 1.4;
+    }
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+    .loading.active {
+      display: block;
+    }
+    .spinner {
+      border: 3px solid #333;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      background: #1a1d25;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: white;
+      font-size: 13px;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    select {
+      width: 100%;
+      padding: 8px;
+      background: #1a1d25;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: white;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎭 Face Embeddings Visualizer</h1>
+    <p>Interactive t-SNE visualization for face recognition embeddings</p>
+  </div>
+
+  <div class="container">
+    <!-- Left Panel: Controls -->
+    <div class="panel">
+      <h3>📁 Data Upload</h3>
+      <div class="upload-area" id="upload-area">
+        <div style="font-size: 36px; margin-bottom: 8px;" id="upload-icon">📤</div>
+        <div style="font-weight: 600; margin-bottom: 4px;" id="upload-text">Drop JSON file</div>
+        <div style="font-size: 11px; color: #888;" id="upload-subtext">or click to browse</div>
+        <div class="upload-status" id="upload-status"></div>
+        <div class="upload-progress" id="upload-progress"></div>
+      </div>
+      <input type="file" id="file-input" accept=".json">
+      <button class="btn btn-success" id="generate-sample">Generate Sample Data</button>
+
+      <h3>⚙️ t-SNE Parameters</h3>
+      <div class="control-group">
+        <label>Perplexity <span class="slider-value" id="perplexity-val">30</span></label>
+        <input type="range" id="perplexity" min="5" max="50" value="30" step="1">
+      </div>
+      <div class="control-group">
+        <label>Learning Rate <span class="slider-value" id="learning-rate-val">100</span></label>
+        <input type="range" id="learning-rate" min="10" max="500" value="100" step="10">
+      </div>
+      <div class="control-group">
+        <label>Max Iterations <span class="slider-value" id="max-iter-val">300</span></label>
+        <input type="range" id="max-iter" min="100" max="1000" value="300" step="50">
+      </div>
+      <button class="btn" id="run-btn">▶️ Run t-SNE</button>
+      <button class="btn btn-secondary" id="rerun-btn" style="display: none;">🔄 Re-run (New Layout)</button>
+
+      <div class="info-box" style="font-size: 11px; margin-top: 10px;">
+        ℹ️ <strong>Results vary each time</strong> - t-SNE is non-deterministic. Run 2-3 times and pick the clearest visualization.
+      </div>
+
+      <h3>🎨 Display Options</h3>
+      <div class="control-group">
+        <label>Point Size <span class="slider-value" id="point-size-val">20</span></label>
+        <input type="range" id="point-size" min="10" max="50" value="20" step="2">
+      </div>
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="show-labels" checked> Show Labels
+        </label>
+      </div>
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="smart-labels" checked> Smart Labels (auto-hide when crowded)
+        </label>
+      </div>
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="show-connections"> Show Connections
+        </label>
+      </div>
+
+      <div class="status">
+        <div class="status-label">Status:</div>
+        <div id="status-text">Ready - Upload or generate sample data</div>
+        <div style="margin-top: 5px;">
+          <span class="status-label">Faces:</span> <span id="face-count">0</span><br>
+          <span class="status-label">Iteration:</span> <span id="iter-text">0</span><br>
+          <span class="status-label">Error:</span> <span id="error-text">-</span>
+        </div>
+      </div>
+
+      <div id="validation-info" style="display: none; margin-top: 12px; padding: 8px; background: #2a2d35; border-radius: 4px; font-size: 11px;">
+        <div style="font-weight: 600; color: #81cfe0; margin-bottom: 6px; font-size: 12px;">📊 Data Validation</div>
+        <div id="validation-details" style="line-height: 1.5;"></div>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>Processing...</div>
+      </div>
+    </div>
+
+    <!-- Center Panel: Canvas -->
+    <div id="canvas-container">
+      <div class="zoom-level" id="zoom-level">100%</div>
+      <div class="zoom-controls">
+        <button class="zoom-btn" id="zoom-in" title="Zoom In">+</button>
+        <button class="zoom-btn" id="zoom-out" title="Zoom Out">−</button>
+        <button class="zoom-btn" id="zoom-reset" title="Reset Zoom" style="font-size: 16px;">⟲</button>
+      </div>
+      <canvas id="canvas" width="1400" height="900"></canvas>
+      <div class="pan-hint" id="pan-hint">🖱️ Click & Drag to pan | ⌨️ Arrow keys to move | Scroll to zoom</div>
+      <div class="view-controls">
+        <button class="view-btn" id="fit-view">📐 Fit to View</button>
+        <button class="view-btn" id="center-view">🎯 Center</button>
+        <button class="view-btn" id="toggle-animation">✨ Animation: ON</button>
+      </div>
+    </div>
+
+    <!-- Right Panel: Details & Groups -->
+    <div class="panel">
+      <h3>🔍 Selected Face</h3>
+      <div class="detail-panel" id="detail-panel">
+        <img id="detail-image" src="" alt="Selected face">
+        <div class="detail-info">
+          <strong>Label:</strong> <span id="detail-label">-</span><br>
+          <strong>Position:</strong> <span id="detail-position">-</span><br>
+          <strong>Group:</strong> <span id="detail-group">-</span>
+        </div>
+        <div style="margin-top: 10px;">
+          <label style="font-size: 12px;">Assign to Group:</label>
+          <select id="group-select">
+            <option value="">No Group</option>
+          </select>
+        </div>
+        <h4 style="margin-top: 15px; font-size: 14px; color: #81cfe0;">Similar Faces</h4>
+        <div class="similar-faces" id="similar-faces"></div>
+      </div>
+      <div class="info-box" id="no-selection" style="display: block;">
+        Click on a face in the visualization to see details and similar faces.
+      </div>
+
+      <h3>👥 Groups</h3>
+      <div class="control-group">
+        <input type="text" id="new-group-name" placeholder="New group name...">
+        <button class="btn btn-secondary" id="add-group" style="margin-top: 5px;">➕ Add Group</button>
+      </div>
+      <button class="btn btn-success" id="auto-cluster">🤖 Auto-Detect Clusters</button>
+      <div id="groups-list"></div>
+
+      <h3>💾 Export</h3>
+      <button class="btn" id="export-json">📄 Export as JSON</button>
+      <button class="btn" id="export-image">🖼️ Save as Image</button>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip">
+    <img id="tooltip-img" src="" alt="">
+    <div class="tooltip-info">
+      <strong id="tooltip-label"></strong><br>
+      <span id="tooltip-coords"></span>
+    </div>
+  </div>
+
+  <script src="../build/tsne.min.js"></script>
+  <script>
+    'use strict';
+
+    // Global state
+    let faceData = { embeddings: [], images: [], labels: [], metadata: {} };
+    let tsneOutput = [];
+    let model = null;
+    let selectedFaceIndex = null;
+    let groups = [];
+    let pointSize = 20;
+    let showLabels = true;
+    let showConnections = false;
+    let smartLabels = true;
+    let hoveredFaceIndex = null;
+    let canvasOffset = { x: 0, y: 0 };
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let runCount = 0;
+    
+    // Zoom and pan state
+    let zoomLevel = 1;
+    let panX = 0;
+    let panY = 0;
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+    let animationProgress = 0;
+
+    // Canvas
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const tooltip = document.getElementById('tooltip');
+
+    // Initialize
+    initializeEventListeners();
+    updateGroupsUI();
+
+    function initializeEventListeners() {
+      // File upload
+      document.getElementById('upload-area').addEventListener('click', () => {
+        document.getElementById('file-input').click();
+      });
+      
+      document.getElementById('file-input').addEventListener('change', handleFileUpload);
+      
+      // Drag and drop
+      const uploadArea = document.getElementById('upload-area');
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+      });
+      uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('drag-over');
+      });
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        if (e.dataTransfer.files.length > 0) {
+          handleFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      // Generate sample
+      document.getElementById('generate-sample').addEventListener('click', generateSampleData);
+
+      // Run t-SNE
+      document.getElementById('run-btn').addEventListener('click', runTSNE);
+      document.getElementById('rerun-btn').addEventListener('click', runTSNE);
+
+      // Sliders
+      document.getElementById('perplexity').addEventListener('input', (e) => {
+        document.getElementById('perplexity-val').textContent = e.target.value;
+      });
+      document.getElementById('learning-rate').addEventListener('input', (e) => {
+        document.getElementById('learning-rate-val').textContent = e.target.value;
+      });
+      document.getElementById('max-iter').addEventListener('input', (e) => {
+        document.getElementById('max-iter-val').textContent = e.target.value;
+      });
+      document.getElementById('point-size').addEventListener('input', (e) => {
+        pointSize = parseInt(e.target.value);
+        document.getElementById('point-size-val').textContent = e.target.value;
+        if (tsneOutput.length > 0) drawVisualization();
+      });
+
+      // Checkboxes
+      document.getElementById('show-labels').addEventListener('change', (e) => {
+        showLabels = e.target.checked;
+        if (tsneOutput.length > 0) drawVisualization();
+      });
+      document.getElementById('smart-labels').addEventListener('change', (e) => {
+        smartLabels = e.target.checked;
+        if (tsneOutput.length > 0) drawVisualization();
+      });
+      document.getElementById('show-connections').addEventListener('change', (e) => {
+        showConnections = e.target.checked;
+        if (tsneOutput.length > 0) drawVisualization();
+      });
+
+      // Canvas interactions
+      canvas.addEventListener('mousemove', handleCanvasHover);
+      canvas.addEventListener('mouseleave', hideTooltip);
+      canvas.addEventListener('click', handleCanvasClick);
+      
+      // Zoom and pan
+      canvas.addEventListener('wheel', handleWheel, { passive: false });
+      canvas.addEventListener('mousedown', handlePanStart);
+      canvas.addEventListener('mousemove', handlePanMove);
+      canvas.addEventListener('mouseup', handlePanEnd);
+      canvas.addEventListener('mouseleave', handlePanEnd);
+      
+      // Zoom controls
+      document.getElementById('zoom-in').addEventListener('click', () => zoomBy(1.2));
+      document.getElementById('zoom-out').addEventListener('click', () => zoomBy(0.8));
+      document.getElementById('zoom-reset').addEventListener('click', resetView);
+      document.getElementById('fit-view').addEventListener('click', fitToView);
+      document.getElementById('center-view').addEventListener('click', centerView);
+      
+      let useAnimation = true;
+      document.getElementById('toggle-animation').addEventListener('click', (e) => {
+        useAnimation = !useAnimation;
+        e.target.textContent = `✨ Animation: ${useAnimation ? 'ON' : 'OFF'}`;
+      });
+      
+      // Keyboard controls
+      document.addEventListener('keydown', handleKeyboard);
+
+      // Groups
+      document.getElementById('add-group').addEventListener('click', addGroup);
+      document.getElementById('auto-cluster').addEventListener('click', autoClusters);
+      document.getElementById('group-select').addEventListener('change', assignToGroup);
+
+      // Export
+      document.getElementById('export-json').addEventListener('click', exportJSON);
+      document.getElementById('export-image').addEventListener('click', exportImage);
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (file) handleFile(file);
+    }
+
+    function handleFile(file) {
+      // Show uploading state
+      const uploadArea = document.getElementById('upload-area');
+      const uploadIcon = document.getElementById('upload-icon');
+      const uploadText = document.getElementById('upload-text');
+      const uploadSubtext = document.getElementById('upload-subtext');
+      const uploadStatus = document.getElementById('upload-status');
+      const uploadProgress = document.getElementById('upload-progress');
+      
+      uploadArea.classList.add('uploading');
+      uploadIcon.textContent = '⏳';
+      uploadText.textContent = 'Reading file...';
+      uploadSubtext.textContent = file.name;
+      uploadStatus.textContent = '0%';
+      
+      const reader = new FileReader();
+      
+      // Simulate progress for better UX
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += 10;
+        if (progress <= 90) {
+          uploadProgress.style.width = progress + '%';
+          uploadStatus.textContent = progress + '%';
+        }
+      }, 50);
+      
+      reader.onload = (e) => {
+        clearInterval(progressInterval);
+        uploadProgress.style.width = '100%';
+        uploadStatus.textContent = 'Processing...';
+        
+        setTimeout(() => {
+          try {
+            const data = JSON.parse(e.target.result);
+            
+            // Validate and show detailed feedback
+            const validation = validateData(data);
+            
+            if (!validation.valid) {
+              uploadArea.classList.remove('uploading');
+              uploadIcon.textContent = '❌';
+              uploadText.textContent = 'Invalid format';
+              uploadSubtext.textContent = 'Check console for details';
+              uploadStatus.textContent = validation.errors[0];
+              uploadStatus.style.color = '#ff6b6b';
+              uploadProgress.style.width = '0%';
+              
+              setTimeout(() => {
+                resetUploadUI();
+              }, 3000);
+              
+              alert('❌ Invalid format:\n\n' + validation.errors.join('\n'));
+              return;
+            }
+            
+            faceData = {
+              embeddings: data.embeddings,
+              images: data.images || [],
+              labels: data.labels || data.embeddings.map((_, i) => `Face ${i + 1}`),
+              metadata: data.metadata || {}
+            };
+            
+            // Show success
+            uploadArea.classList.remove('uploading');
+            uploadArea.classList.add('success');
+            uploadIcon.textContent = '✅';
+            uploadText.textContent = 'Upload successful!';
+            uploadSubtext.textContent = `${faceData.embeddings.length} faces loaded`;
+            uploadStatus.textContent = '100% Complete';
+            uploadStatus.style.color = '#4ade80';
+            
+            // Show validation success
+            showValidationInfo(validation);
+            
+            document.getElementById('face-count').textContent = faceData.embeddings.length;
+            document.getElementById('status-text').textContent = `Loaded ${faceData.embeddings.length} faces - Ready to visualize!`;
+            
+            setTimeout(() => {
+              uploadArea.classList.remove('success');
+              uploadProgress.style.width = '0%';
+            }, 2000);
+            
+          } catch (error) {
+            clearInterval(progressInterval);
+            uploadArea.classList.remove('uploading');
+            uploadIcon.textContent = '❌';
+            uploadText.textContent = 'Error reading file';
+            uploadSubtext.textContent = error.message;
+            uploadStatus.textContent = 'Failed';
+            uploadStatus.style.color = '#ff6b6b';
+            uploadProgress.style.width = '0%';
+            
+            setTimeout(() => {
+              resetUploadUI();
+            }, 3000);
+            
+            alert('Error parsing JSON file: ' + error.message);
+          }
+        }, 300);
+      };
+      
+      reader.readAsText(file);
+    }
+
+    function resetUploadUI() {
+      const uploadArea = document.getElementById('upload-area');
+      const uploadIcon = document.getElementById('upload-icon');
+      const uploadText = document.getElementById('upload-text');
+      const uploadSubtext = document.getElementById('upload-subtext');
+      const uploadStatus = document.getElementById('upload-status');
+      
+      uploadArea.className = 'upload-area';
+      uploadIcon.textContent = '📤';
+      uploadText.textContent = 'Drop JSON file';
+      uploadSubtext.textContent = 'or click to browse';
+      uploadStatus.textContent = '';
+      uploadStatus.style.color = '#4ade80';
+    }
+
+    function validateData(data) {
+      const errors = [];
+      const warnings = [];
+      const info = [];
+      
+      // Check embeddings exist and is array
+      if (!data.embeddings) {
+        errors.push('❌ Missing "embeddings" field');
+        return { valid: false, errors, warnings, info };
+      }
+      
+      if (!Array.isArray(data.embeddings)) {
+        errors.push('❌ "embeddings" must be an array');
+        return { valid: false, errors, warnings, info };
+      }
+      
+      if (data.embeddings.length === 0) {
+        errors.push('❌ "embeddings" array is empty');
+        return { valid: false, errors, warnings, info };
+      }
+      
+      // Check embedding structure
+      const firstEmbedding = data.embeddings[0];
+      if (!Array.isArray(firstEmbedding)) {
+        errors.push('❌ Each embedding must be an array of numbers');
+        return { valid: false, errors, warnings, info };
+      }
+      
+      const embeddingDim = firstEmbedding.length;
+      info.push(`✅ Embedding dimension: ${embeddingDim}D`);
+      
+      // Check all embeddings same dimension
+      for (let i = 0; i < data.embeddings.length; i++) {
+        if (!Array.isArray(data.embeddings[i])) {
+          errors.push(`❌ Embedding ${i} is not an array`);
+          return { valid: false, errors, warnings, info };
+        }
+        if (data.embeddings[i].length !== embeddingDim) {
+          errors.push(`❌ Embedding ${i} has ${data.embeddings[i].length} dimensions, expected ${embeddingDim}`);
+          return { valid: false, errors, warnings, info };
+        }
+        // Check all values are numbers
+        for (let j = 0; j < data.embeddings[i].length; j++) {
+          if (typeof data.embeddings[i][j] !== 'number' || isNaN(data.embeddings[i][j])) {
+            errors.push(`❌ Embedding ${i} contains non-numeric values`);
+            return { valid: false, errors, warnings, info };
+          }
+        }
+      }
+      
+      info.push(`✅ Loaded: ${data.embeddings.length} faces`);
+      
+      // Check labels
+      if (data.labels) {
+        if (Array.isArray(data.labels)) {
+          if (data.labels.length === data.embeddings.length) {
+            info.push(`✅ Labels: ${data.labels.length}/${data.embeddings.length} ✓`);
+          } else {
+            warnings.push(`⚠️ Labels count (${data.labels.length}) doesn't match embeddings (${data.embeddings.length})`);
+          }
+        } else {
+          warnings.push('⚠️ "labels" field exists but is not an array');
+        }
+      } else {
+        info.push('ℹ️ Labels: Will auto-generate (Face 1, Face 2, ...)');
+      }
+      
+      // Check images
+      if (data.images) {
+        if (Array.isArray(data.images)) {
+          const validImages = data.images.filter(img => img && img.length > 0).length;
+          if (data.images.length === data.embeddings.length) {
+            if (validImages === data.embeddings.length) {
+              info.push(`✅ Images: ${validImages}/${data.embeddings.length} ✓`);
+            } else {
+              info.push(`ℹ️ Images: ${validImages}/${data.embeddings.length} (${data.embeddings.length - validImages} missing)`);
+            }
+          } else {
+            warnings.push(`⚠️ Images count (${data.images.length}) doesn't match embeddings (${data.embeddings.length})`);
+          }
+        } else {
+          warnings.push('⚠️ "images" field exists but is not an array');
+        }
+      } else {
+        info.push('ℹ️ Images: None provided (will show dots)');
+      }
+      
+      // Distance metric used
+      info.push('ℹ️ Distance: Euclidean (L2 norm)');
+      
+      return {
+        valid: errors.length === 0,
+        errors,
+        warnings,
+        info
+      };
+    }
+
+    function showValidationInfo(validation) {
+      const validationDiv = document.getElementById('validation-info');
+      const detailsDiv = document.getElementById('validation-details');
+      
+      let html = '';
+      
+      // Show info
+      validation.info.forEach(msg => {
+        html += `<div style="margin: 3px 0; color: #4ade80;">${msg}</div>`;
+      });
+      
+      // Show warnings
+      validation.warnings.forEach(msg => {
+        html += `<div style="margin: 3px 0; color: #fbbf24;">${msg}</div>`;
+      });
+      
+      detailsDiv.innerHTML = html;
+      validationDiv.style.display = 'block';
+    }
+
+    function generateSampleData() {
+      const numFaces = 50;
+      const dim = 128; // Face embedding dimension
+      faceData = { embeddings: [], images: [], labels: [], metadata: {} };
+
+      // Generate sample face names
+      const names = ['Alex', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Avery', 'Quinn', 'Sage', 'Parker'];
+      
+      // Create 5 clusters of faces
+      for (let cluster = 0; cluster < 5; cluster++) {
+        for (let i = 0; i < 10; i++) {
+          const embedding = [];
+          for (let d = 0; d < dim; d++) {
+            const center = cluster * 0.5 - 1.0;
+            embedding.push(center + (Math.random() - 0.5) * 0.3);
+          }
+          faceData.embeddings.push(embedding);
+          faceData.labels.push(`${names[i % names.length]} ${cluster + 1}`);
+          
+          // Generate a simple colored circle as face image
+          const faceCanvas = document.createElement('canvas');
+          faceCanvas.width = 100;
+          faceCanvas.height = 100;
+          const faceCtx = faceCanvas.getContext('2d');
+          
+          // Background
+          const hue = (cluster * 72 + i * 10) % 360;
+          faceCtx.fillStyle = `hsl(${hue}, 60%, 50%)`;
+          faceCtx.beginPath();
+          faceCtx.arc(50, 50, 40, 0, 2 * Math.PI);
+          faceCtx.fill();
+          
+          // "Eyes"
+          faceCtx.fillStyle = 'white';
+          faceCtx.beginPath();
+          faceCtx.arc(35, 40, 8, 0, 2 * Math.PI);
+          faceCtx.arc(65, 40, 8, 0, 2 * Math.PI);
+          faceCtx.fill();
+          
+          // "Pupils"
+          faceCtx.fillStyle = 'black';
+          faceCtx.beginPath();
+          faceCtx.arc(35, 40, 4, 0, 2 * Math.PI);
+          faceCtx.arc(65, 40, 4, 0, 2 * Math.PI);
+          faceCtx.fill();
+          
+          // "Smile"
+          faceCtx.strokeStyle = 'white';
+          faceCtx.lineWidth = 3;
+          faceCtx.beginPath();
+          faceCtx.arc(50, 50, 20, 0.2, Math.PI - 0.2);
+          faceCtx.stroke();
+          
+          faceData.images.push(faceCanvas.toDataURL());
+        }
+      }
+
+      // Animate sample generation
+      const uploadArea = document.getElementById('upload-area');
+      const uploadIcon = document.getElementById('upload-icon');
+      const uploadText = document.getElementById('upload-text');
+      const uploadSubtext = document.getElementById('upload-subtext');
+      const uploadStatus = document.getElementById('upload-status');
+      const uploadProgress = document.getElementById('upload-progress');
+      
+      uploadArea.classList.add('uploading', 'shimmer');
+      uploadIcon.textContent = '🎲';
+      uploadText.textContent = 'Generating faces...';
+      uploadSubtext.textContent = 'Creating 50 sample embeddings';
+      uploadStatus.textContent = 'Processing...';
+      
+      // Simulate progress
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 20;
+        uploadProgress.style.width = progress + '%';
+        uploadStatus.textContent = progress + '%';
+        if (progress >= 100) clearInterval(interval);
+      }, 100);
+      
+      setTimeout(() => {
+        uploadArea.classList.remove('uploading', 'shimmer');
+        uploadArea.classList.add('success');
+        uploadIcon.textContent = '✨';
+        uploadText.textContent = 'Sample data ready!';
+        uploadSubtext.textContent = '50 faces generated';
+        uploadStatus.textContent = '100% Complete';
+        
+        document.getElementById('face-count').textContent = faceData.embeddings.length;
+        document.getElementById('status-text').textContent = `Generated ${faceData.embeddings.length} sample faces - Ready to visualize!`;
+        
+        // Show validation for sample data
+        const validation = validateData(faceData);
+        showValidationInfo(validation);
+        
+        setTimeout(() => {
+          uploadArea.classList.remove('success');
+          uploadProgress.style.width = '0%';
+          resetUploadUI();
+        }, 2000);
+      }, 600);
+    }
+
+    async function runTSNE() {
+      if (faceData.embeddings.length === 0) {
+        alert('Please upload data or generate sample data first!');
+        return;
+      }
+
+      document.getElementById('loading').classList.add('active');
+      document.getElementById('run-btn').disabled = true;
+      document.getElementById('rerun-btn').disabled = true;
+      const nextRun = runCount + 1;
+      document.getElementById('status-text').textContent = `Run #${nextRun}: Initializing t-SNE...`;
+
+      const perplexity = parseInt(document.getElementById('perplexity').value);
+      const learningRate = parseInt(document.getElementById('learning-rate').value);
+      const nIter = parseInt(document.getElementById('max-iter').value);
+
+      model = new TSNE({
+        dim: 2,
+        perplexity: Math.min(perplexity, Math.floor(faceData.embeddings.length / 3)),
+        earlyExaggeration: 4.0,
+        learningRate: learningRate,
+        nIter: nIter,
+        metric: 'euclidean'
+      });
+
+      model.init({
+        data: faceData.embeddings,
+        type: 'dense'
+      });
+
+      model.on('progressIter', (iterData) => {
+        document.getElementById('iter-text').textContent = iterData[0] + 1;
+        document.getElementById('error-text').textContent = iterData[1].toPrecision(7);
+        if (iterData[0] % 10 === 0) {
+          tsneOutput = model.getOutputScaled();
+          drawVisualization();
+        }
+      });
+
+      model.on('progressStatus', (status) => {
+        document.getElementById('status-text').textContent = status;
+      });
+
+      setTimeout(() => {
+        model.run();
+        tsneOutput = model.getOutputScaled();
+        
+        // Auto fit to view after completion
+        resetView();
+        fitToView();
+        
+        // Smooth reveal animation
+        animateVisualization();
+        
+        document.getElementById('loading').classList.remove('active');
+        runCount++;
+        
+        let statusMsg = `Complete! (Run #${runCount})`;
+        if (runCount === 1) {
+          statusMsg += ' - Try re-running for different layouts.';
+        } else {
+          statusMsg += ' - Pick the clearest visualization!';
+        }
+        document.getElementById('status-text').textContent = statusMsg;
+        
+        document.getElementById('run-btn').disabled = false;
+        document.getElementById('rerun-btn').disabled = false;
+        document.getElementById('rerun-btn').style.display = 'block';
+      }, 100);
+    }
+
+    function animateVisualization() {
+      let alpha = 0;
+      const fadeIn = () => {
+        alpha += 0.05;
+        if (alpha <= 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          drawVisualization();
+          ctx.restore();
+          requestAnimationFrame(fadeIn);
+        } else {
+          drawVisualization();
+        }
+      };
+      fadeIn();
+    }
+
+    function drawVisualization() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#1a1d25';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (tsneOutput.length === 0) return;
+
+      // Apply zoom and pan transformations
+      ctx.save();
+      ctx.translate(canvas.width / 2 + panX, canvas.height / 2 + panY);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+      const margin = 60;
+      const width = canvas.width - 2 * margin;
+      const height = canvas.height - 2 * margin;
+
+      // Draw connections if enabled
+      if (showConnections) {
+        drawConnections(margin, width, height);
+      }
+
+      // Draw faces
+      tsneOutput.forEach((point, i) => {
+        const x = margin + (point[0] + 1) * width / 2;
+        const y = margin + (point[1] + 1) * height / 2;
+
+        // Determine color
+        let color = '#81cfe0';
+        const faceGroup = groups.find(g => g.faces.includes(i));
+        if (faceGroup) {
+          color = faceGroup.color;
+        }
+
+        // Draw face image if available
+        if (faceData.images[i]) {
+          const img = new Image();
+          img.src = faceData.images[i];
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(x, y, pointSize / 2, 0, 2 * Math.PI);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(img, x - pointSize / 2, y - pointSize / 2, pointSize, pointSize);
+          ctx.restore();
+          
+          // Border
+          ctx.strokeStyle = i === selectedFaceIndex ? '#ffff00' : color;
+          ctx.lineWidth = i === selectedFaceIndex ? 4 : 2;
+          ctx.beginPath();
+          ctx.arc(x, y, pointSize / 2, 0, 2 * Math.PI);
+          ctx.stroke();
+        } else {
+          // Draw circle if no image
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, pointSize / 2, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.strokeStyle = i === selectedFaceIndex ? '#ffff00' : '#fff';
+          ctx.lineWidth = i === selectedFaceIndex ? 3 : 1;
+          ctx.stroke();
+        }
+
+        // Draw label with smart visibility
+        if (showLabels && faceData.labels[i]) {
+          const shouldShow = smartLabels ? (
+            // Show label if: not crowded OR currently hovered OR selected
+            !shouldHideLabels() || hoveredFaceIndex === i || selectedFaceIndex === i
+          ) : true;
+          
+          if (shouldShow) {
+            // Highlight hovered/selected label
+            if (hoveredFaceIndex === i || selectedFaceIndex === i) {
+              ctx.fillStyle = '#ffff00';
+              ctx.font = 'bold 12px Arial';
+            } else {
+              ctx.fillStyle = '#fff';
+              ctx.font = '11px Arial';
+            }
+            ctx.textAlign = 'center';
+            
+            // Add background for better readability
+            const textWidth = ctx.measureText(faceData.labels[i]).width;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(x - textWidth/2 - 3, y + pointSize/2 + 2, textWidth + 6, 16);
+            
+            ctx.fillStyle = hoveredFaceIndex === i || selectedFaceIndex === i ? '#ffff00' : '#fff';
+            ctx.fillText(faceData.labels[i], x, y + pointSize / 2 + 14);
+          }
+        }
+      });
+      
+      ctx.restore(); // Restore original transform
+    }
+
+    function shouldHideLabels() {
+      // Hide labels if more than 30 faces or if zoomed out below 80%
+      return faceData.embeddings.length > 30 || zoomLevel < 0.8;
+    }
+
+    function drawConnections(margin, width, height) {
+      const k = 3; // Number of nearest neighbors to connect
+      
+      tsneOutput.forEach((point, i) => {
+        const x1 = margin + (point[0] + 1) * width / 2;
+        const y1 = margin + (point[1] + 1) * height / 2;
+
+        // Find k nearest neighbors
+        const distances = tsneOutput.map((p, j) => {
+          if (i === j) return { index: j, dist: Infinity };
+          const dx = point[0] - p[0];
+          const dy = point[1] - p[1];
+          return { index: j, dist: Math.sqrt(dx * dx + dy * dy) };
+        });
+
+        distances.sort((a, b) => a.dist - b.dist);
+
+        for (let n = 0; n < Math.min(k, distances.length); n++) {
+          const j = distances[n].index;
+          const x2 = margin + (tsneOutput[j][0] + 1) * width / 2;
+          const y2 = margin + (tsneOutput[j][1] + 1) * height / 2;
+
+          ctx.strokeStyle = 'rgba(129, 207, 224, 0.1)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+      });
+    }
+
+    function transformMouseCoords(mouseX, mouseY) {
+      // Transform mouse coords to account for zoom and pan
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      
+      const x = (mouseX - centerX - panX) / zoomLevel + centerX;
+      const y = (mouseY - centerY - panY) / zoomLevel + centerY;
+      
+      return { x, y };
+    }
+
+    function handleCanvasHover(event) {
+      if (tsneOutput.length === 0 || isPanning) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      const transformed = transformMouseCoords(mouseX, mouseY);
+
+      const margin = 60;
+      const width = canvas.width - 2 * margin;
+      const height = canvas.height - 2 * margin;
+
+      let hoveredIndex = -1;
+      for (let i = 0; i < tsneOutput.length; i++) {
+        const x = margin + (tsneOutput[i][0] + 1) * width / 2;
+        const y = margin + (tsneOutput[i][1] + 1) * height / 2;
+        const dx = transformed.x - x;
+        const dy = transformed.y - y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < pointSize / 2) {
+          hoveredIndex = i;
+          break;
+        }
+      }
+
+      if (hoveredIndex >= 0) {
+        if (hoveredFaceIndex !== hoveredIndex) {
+          hoveredFaceIndex = hoveredIndex;
+          if (smartLabels && shouldHideLabels()) {
+            drawVisualization(); // Redraw to show hovered label
+          }
+        }
+        showTooltip(event, hoveredIndex);
+        canvas.style.cursor = 'pointer';
+      } else {
+        if (hoveredFaceIndex !== null) {
+          hoveredFaceIndex = null;
+          if (smartLabels && shouldHideLabels()) {
+            drawVisualization(); // Redraw to hide label
+          }
+        }
+        hideTooltip();
+        canvas.style.cursor = isPanning ? 'grabbing' : 'grab';
+      }
+    }
+
+    function showTooltip(event, index) {
+      const img = document.getElementById('tooltip-img');
+      const label = document.getElementById('tooltip-label');
+      const coords = document.getElementById('tooltip-coords');
+
+      if (faceData.images[index]) {
+        img.src = faceData.images[index];
+        img.style.display = 'block';
+      } else {
+        img.style.display = 'none';
+      }
+
+      label.textContent = faceData.labels[index] || `Face ${index + 1}`;
+      coords.textContent = `Position: (${tsneOutput[index][0].toFixed(3)}, ${tsneOutput[index][1].toFixed(3)})`;
+
+      tooltip.style.display = 'block';
+      tooltip.style.left = (event.clientX + 15) + 'px';
+      tooltip.style.top = (event.clientY + 15) + 'px';
+    }
+
+    function hideTooltip() {
+      tooltip.style.display = 'none';
+    }
+
+    function handleCanvasClick(event) {
+      if (tsneOutput.length === 0 || isPanning) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      const transformed = transformMouseCoords(mouseX, mouseY);
+
+      const margin = 60;
+      const width = canvas.width - 2 * margin;
+      const height = canvas.height - 2 * margin;
+
+      for (let i = 0; i < tsneOutput.length; i++) {
+        const x = margin + (tsneOutput[i][0] + 1) * width / 2;
+        const y = margin + (tsneOutput[i][1] + 1) * height / 2;
+        const dx = transformed.x - x;
+        const dy = transformed.y - y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < pointSize / 2) {
+          selectFace(i);
+          drawVisualization();
+          return;
+        }
+      }
+
+      // Clicked on empty space
+      selectedFaceIndex = null;
+      document.getElementById('detail-panel').classList.remove('active');
+      document.getElementById('no-selection').style.display = 'block';
+      drawVisualization();
+    }
+
+    function selectFace(index) {
+      selectedFaceIndex = index;
+      document.getElementById('no-selection').style.display = 'none';
+      document.getElementById('detail-panel').classList.add('active');
+
+      const detailImg = document.getElementById('detail-image');
+      if (faceData.images[index]) {
+        detailImg.src = faceData.images[index];
+        detailImg.style.display = 'block';
+      } else {
+        detailImg.style.display = 'none';
+      }
+
+      document.getElementById('detail-label').textContent = faceData.labels[index] || `Face ${index + 1}`;
+      document.getElementById('detail-position').textContent = 
+        `(${tsneOutput[index][0].toFixed(3)}, ${tsneOutput[index][1].toFixed(3)})`;
+
+      const faceGroup = groups.find(g => g.faces.includes(index));
+      document.getElementById('detail-group').textContent = faceGroup ? faceGroup.name : 'None';
+
+      // Show similar faces
+      showSimilarFaces(index);
+    }
+
+    function showSimilarFaces(index) {
+      const similarContainer = document.getElementById('similar-faces');
+      similarContainer.innerHTML = '';
+
+      // Calculate distances in embedding space
+      const distances = faceData.embeddings.map((emb, i) => {
+        if (i === index) return { index: i, dist: Infinity };
+        let dist = 0;
+        for (let d = 0; d < emb.length; d++) {
+          const diff = faceData.embeddings[index][d] - emb[d];
+          dist += diff * diff;
+        }
+        return { index: i, dist: Math.sqrt(dist) };
+      });
+
+      distances.sort((a, b) => a.dist - b.dist);
+
+      // Show top 6 similar faces
+      for (let i = 0; i < Math.min(6, distances.length); i++) {
+        const idx = distances[i].index;
+        if (faceData.images[idx]) {
+          const faceDiv = document.createElement('div');
+          faceDiv.className = 'similar-face';
+          faceDiv.title = faceData.labels[idx];
+          faceDiv.innerHTML = `<img src="${faceData.images[idx]}" alt="${faceData.labels[idx]}">`;
+          faceDiv.addEventListener('click', () => {
+            selectFace(idx);
+            drawVisualization();
+          });
+          similarContainer.appendChild(faceDiv);
+        }
+      }
+    }
+
+    function addGroup() {
+      const name = document.getElementById('new-group-name').value.trim();
+      if (!name) {
+        alert('Please enter a group name');
+        return;
+      }
+
+      const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7', '#fd79a8', '#00b894', '#fdcb6e'];
+      const color = colors[groups.length % colors.length];
+
+      groups.push({
+        name: name,
+        color: color,
+        faces: []
+      });
+
+      document.getElementById('new-group-name').value = '';
+      updateGroupsUI();
+    }
+
+    function updateGroupsUI() {
+      const groupsList = document.getElementById('groups-list');
+      const groupSelect = document.getElementById('group-select');
+
+      groupsList.innerHTML = '';
+      groupSelect.innerHTML = '<option value="">No Group</option>';
+
+      groups.forEach((group, index) => {
+        // Add to list
+        const groupItem = document.createElement('div');
+        groupItem.className = 'group-item';
+        groupItem.innerHTML = `
+          <div class="group-color" style="background: ${group.color};"></div>
+          <div class="group-info">
+            <strong>${group.name}</strong><br>
+            ${group.faces.length} faces
+          </div>
+        `;
+        groupItem.addEventListener('click', () => highlightGroup(index));
+        groupsList.appendChild(groupItem);
+
+        // Add to select
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = group.name;
+        groupSelect.appendChild(option);
+      });
+    }
+
+    function assignToGroup(event) {
+      if (selectedFaceIndex === null) return;
+
+      const groupIndex = event.target.value;
+
+      // Remove from all groups first
+      groups.forEach(g => {
+        const idx = g.faces.indexOf(selectedFaceIndex);
+        if (idx >= 0) g.faces.splice(idx, 1);
+      });
+
+      // Add to new group if selected
+      if (groupIndex !== '') {
+        groups[parseInt(groupIndex)].faces.push(selectedFaceIndex);
+      }
+
+      updateGroupsUI();
+      drawVisualization();
+    }
+
+    function highlightGroup(groupIndex) {
+      // Visual highlight could be added here
+      drawVisualization();
+    }
+
+    function autoClusters() {
+      if (tsneOutput.length === 0) {
+        alert('Please run t-SNE first!');
+        return;
+      }
+
+      // Simple k-means clustering in 2D space
+      const k = Math.min(5, Math.floor(tsneOutput.length / 10));
+      const maxIter = 10;
+
+      // Initialize centroids randomly
+      const centroids = [];
+      for (let i = 0; i < k; i++) {
+        const randomIndex = Math.floor(Math.random() * tsneOutput.length);
+        centroids.push([...tsneOutput[randomIndex]]);
+      }
+
+      // K-means iterations
+      let assignments = new Array(tsneOutput.length).fill(0);
+      
+      for (let iter = 0; iter < maxIter; iter++) {
+        // Assign points to nearest centroid
+        for (let i = 0; i < tsneOutput.length; i++) {
+          let minDist = Infinity;
+          let minCluster = 0;
+          for (let c = 0; c < k; c++) {
+            const dx = tsneOutput[i][0] - centroids[c][0];
+            const dy = tsneOutput[i][1] - centroids[c][1];
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < minDist) {
+              minDist = dist;
+              minCluster = c;
+            }
+          }
+          assignments[i] = minCluster;
+        }
+
+        // Update centroids
+        for (let c = 0; c < k; c++) {
+          let sumX = 0, sumY = 0, count = 0;
+          for (let i = 0; i < tsneOutput.length; i++) {
+            if (assignments[i] === c) {
+              sumX += tsneOutput[i][0];
+              sumY += tsneOutput[i][1];
+              count++;
+            }
+          }
+          if (count > 0) {
+            centroids[c] = [sumX / count, sumY / count];
+          }
+        }
+      }
+
+      // Create groups from clusters
+      groups = [];
+      const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7', '#fd79a8', '#00b894', '#fdcb6e'];
+      
+      for (let c = 0; c < k; c++) {
+        const faceIndices = [];
+        for (let i = 0; i < tsneOutput.length; i++) {
+          if (assignments[i] === c) {
+            faceIndices.push(i);
+          }
+        }
+        if (faceIndices.length > 0) {
+          groups.push({
+            name: `Cluster ${c + 1}`,
+            color: colors[c % colors.length],
+            faces: faceIndices
+          });
+        }
+      }
+
+      updateGroupsUI();
+      drawVisualization();
+      document.getElementById('status-text').textContent = `Auto-detected ${groups.length} clusters`;
+    }
+
+    // Zoom and Pan handlers
+    function handleWheel(event) {
+      event.preventDefault();
+      const zoomIntensity = 0.1;
+      const delta = event.deltaY > 0 ? -zoomIntensity : zoomIntensity;
+      const newZoom = zoomLevel * (1 + delta);
+      
+      if (newZoom >= 0.5 && newZoom <= 5) {
+        zoomLevel = newZoom;
+        updateZoomDisplay();
+        drawVisualization();
+      }
+    }
+
+    function zoomBy(factor) {
+      const newZoom = zoomLevel * factor;
+      if (newZoom >= 0.5 && newZoom <= 5) {
+        zoomLevel = newZoom;
+        updateZoomDisplay();
+        drawVisualization();
+        
+        // Show pan hint when zoomed in
+        if (zoomLevel > 1.1) {
+          showPanHint();
+        }
+      }
+    }
+
+    function showPanHint() {
+      const hint = document.getElementById('pan-hint');
+      hint.classList.add('show');
+      setTimeout(() => {
+        hint.classList.remove('show');
+      }, 3000);
+    }
+
+    function handlePanStart(event) {
+      if (tsneOutput.length === 0) return;
+      isPanning = true;
+      panStartX = event.clientX - panX;
+      panStartY = event.clientY - panY;
+      canvas.style.cursor = 'grabbing';
+    }
+
+    function handlePanMove(event) {
+      if (!isPanning) return;
+      panX = event.clientX - panStartX;
+      panY = event.clientY - panStartY;
+      drawVisualization();
+    }
+
+    function handlePanEnd() {
+      if (isPanning) {
+        isPanning = false;
+        canvas.style.cursor = 'grab';
+      }
+    }
+
+    function resetView() {
+      zoomLevel = 1;
+      panX = 0;
+      panY = 0;
+      updateZoomDisplay();
+      drawVisualization();
+    }
+
+    function centerView() {
+      panX = 0;
+      panY = 0;
+      drawVisualization();
+    }
+
+    function fitToView() {
+      if (tsneOutput.length === 0) return;
+      
+      // Find bounding box of all points
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      
+      const margin = 60;
+      const width = canvas.width - 2 * margin;
+      const height = canvas.height - 2 * margin;
+      
+      tsneOutput.forEach(point => {
+        const x = margin + (point[0] + 1) * width / 2;
+        const y = margin + (point[1] + 1) * height / 2;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      });
+      
+      // Calculate zoom to fit
+      const dataWidth = maxX - minX;
+      const dataHeight = maxY - minY;
+      const zoomX = (canvas.width * 0.8) / dataWidth;
+      const zoomY = (canvas.height * 0.8) / dataHeight;
+      zoomLevel = Math.min(zoomX, zoomY, 2); // Cap at 2x
+      
+      // Center the view
+      panX = 0;
+      panY = 0;
+      
+      updateZoomDisplay();
+      drawVisualization();
+    }
+
+    function updateZoomDisplay() {
+      document.getElementById('zoom-level').textContent = `${Math.round(zoomLevel * 100)}%`;
+    }
+
+    function handleKeyboard(event) {
+      if (tsneOutput.length === 0) return;
+      
+      // Don't interfere with input fields
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+        return;
+      }
+      
+      const panSpeed = 50;
+      let handled = false;
+      
+      switch(event.key) {
+        case 'ArrowLeft':
+          panX += panSpeed;
+          handled = true;
+          break;
+        case 'ArrowRight':
+          panX -= panSpeed;
+          handled = true;
+          break;
+        case 'ArrowUp':
+          panY += panSpeed;
+          handled = true;
+          break;
+        case 'ArrowDown':
+          panY -= panSpeed;
+          handled = true;
+          break;
+        case '+':
+        case '=':
+          zoomBy(1.2);
+          handled = true;
+          break;
+        case '-':
+        case '_':
+          zoomBy(0.8);
+          handled = true;
+          break;
+        case '0':
+          resetView();
+          handled = true;
+          break;
+        case 'f':
+        case 'F':
+          fitToView();
+          handled = true;
+          break;
+        case 'c':
+        case 'C':
+          centerView();
+          handled = true;
+          break;
+      }
+      
+      if (handled) {
+        event.preventDefault();
+        drawVisualization();
+      }
+    }
+
+    function exportJSON() {
+      const exportData = {
+        embeddings: faceData.embeddings,
+        images: faceData.images,
+        labels: faceData.labels,
+        tsneOutput: tsneOutput,
+        groups: groups,
+        metadata: faceData.metadata
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'face-embeddings-export.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportImage() {
+      const link = document.createElement('a');
+      link.download = 'face-embeddings-visualization.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+  </script>
+</body>
+</html>
+
